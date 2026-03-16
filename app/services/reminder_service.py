@@ -1,7 +1,5 @@
 from sqlalchemy.orm import Session
 from datetime import datetime
-import pytz
-
 from app.models.reminder import Reminder
 from app.models.care_histroy import CareHistory
 from app.schemas.reminder_schema import ReminderCreate
@@ -83,8 +81,7 @@ def get_user_reminders(db: Session, user_id: int):
 # GET PENDING REMINDERS
 def get_pending_reminders(db: Session, user_id: int):
 
-    ist = pytz.timezone("Asia/Kolkata")
-    now = datetime.now(ist)
+    now = datetime.utcnow()
 
     return (
         db.query(Reminder)
@@ -237,8 +234,7 @@ def update_reminder(db: Session, reminder_id: int, user_id: int, data):
 # ALERT COUNT
 def get_pending_alert_count(db: Session, user_id: int):
 
-    ist = pytz.timezone("Asia/Kolkata")
-    now = datetime.now(ist)
+    now = datetime.utcnow()
 
     return (
         db.query(Reminder)
@@ -254,8 +250,7 @@ def get_pending_alert_count(db: Session, user_id: int):
 # COMPLETE ALL REMINDERS
 def complete_all_reminders(db: Session, user_id: int):
 
-    ist = pytz.timezone("Asia/Kolkata")
-    now = datetime.now(ist)
+    now = datetime.utcnow()
 
     reminders = (
         db.query(Reminder)
