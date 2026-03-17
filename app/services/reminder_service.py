@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models.reminder import Reminder
 from app.models.care_histroy import CareHistory
 from app.schemas.reminder_schema import ReminderCreate
@@ -10,12 +10,19 @@ from app.models.plants import Plant
 # CREATE REMINDER
 def create_reminder(db: Session, user, data: ReminderCreate):
 
+    # 🔥 FIX: ensure UTC
+    reminder_time = data.reminder_time
+    if reminder_time.tzinfo is None:
+        reminder_time = reminder_time.replace(tzinfo=timezone.utc)
+    else:
+        reminder_time = reminder_time.astimezone(timezone.utc)
+
     # ⭐ DUPLICATE CHECK
     existing = db.query(Reminder).filter(
         Reminder.user_id == user.id,
         Reminder.plant_id == data.plant_id,
         Reminder.type == data.type,
-        Reminder.reminder_time == data.reminder_time,
+        Reminder.reminder_time == reminder_time,
         Reminder.status == "pending"
     ).first()
 
@@ -27,7 +34,7 @@ def create_reminder(db: Session, user, data: ReminderCreate):
         plant_id=data.plant_id,
         title=data.title,
         description=data.description,
-        reminder_time=data.reminder_time,
+        reminder_time=reminder_time,  # ✅ FIXED
         type=data.type,
         day_of_week=data.day_of_week,
         status="pending",
@@ -60,7 +67,6 @@ def get_user_reminders(db: Session, user_id: int):
         if not image and plant.plant:
             image = plant.plant.image_url 
 
-
         result.append({
             "id": reminder.id,
             "plant_id": reminder.plant_id,
@@ -70,8 +76,8 @@ def get_user_reminders(db: Session, user_id: int):
             "description": reminder.description,
             "type": reminder.type,
             "day_of_week": reminder.day_of_week,
-            "reminder_time": reminder.reminder_time,
-            "created_at": reminder.created_at,
+            "reminder_time": reminder.reminder_time.isoformat(),  # ✅ FIX
+            "created_at": reminder.created_at.isoformat(),        # ✅ FIX
             "created_by": reminder.created_by
         })
 
@@ -81,7 +87,7 @@ def get_user_reminders(db: Session, user_id: int):
 # GET PENDING REMINDERS
 def get_pending_reminders(db: Session, user_id: int):
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     return (
         db.query(Reminder)
@@ -117,7 +123,7 @@ def complete_reminder(db: Session, reminder_id: int, user_id: int):
         plant_id=reminder.plant_id,
         action_type=reminder.type,
         note=reminder.title,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
 
     db.add(history)
@@ -181,10 +187,19 @@ def update_reminder(db: Session, reminder_id: int, user_id: int, data):
     if not reminder:
         return None
 
-    # FINAL VALUES (use existing if not provided)
+    # 🔥 FIX: handle UTC conversion
+    if data.reminder_time is not None:
+        reminder_time = data.reminder_time
+
+        if reminder_time.tzinfo is None:
+            reminder_time = reminder_time.replace(tzinfo=timezone.utc)
+        else:
+            reminder_time = reminder_time.astimezone(timezone.utc)
+    else:
+        reminder_time = reminder.reminder_time
+
     plant_id = data.plant_id if data.plant_id is not None else reminder.plant_id
     reminder_type = data.type if data.type is not None else reminder.type
-    reminder_time = data.reminder_time if data.reminder_time is not None else reminder.reminder_time
 
     # ⭐ DUPLICATE CHECK
     duplicate = db.query(Reminder).filter(
@@ -198,17 +213,6 @@ def update_reminder(db: Session, reminder_id: int, user_id: int, data):
     if duplicate:
         return {"error": "Another reminder already exists with same plant and time"}
 
-    # ⭐ CHECK IF ANY CHANGE
-    if (
-        plant_id == reminder.plant_id and
-        (data.title is None or data.title == reminder.title) and
-        (data.description is None or data.description == reminder.description) and
-        reminder_time == reminder.reminder_time and
-        reminder_type == reminder.type and
-        (data.day_of_week is None or data.day_of_week == reminder.day_of_week)
-    ):
-        return {"error": "No record updated"}
-
     # UPDATE FIELDS
     reminder.plant_id = plant_id
 
@@ -218,12 +222,11 @@ def update_reminder(db: Session, reminder_id: int, user_id: int, data):
     if data.description is not None:
         reminder.description = data.description
 
-    reminder.reminder_time = reminder_time
+    reminder.reminder_time = reminder_time  # ✅ FIXED
     reminder.type = reminder_type
 
     if data.day_of_week is not None:
         reminder.day_of_week = data.day_of_week
-
 
     db.commit()
     db.refresh(reminder)
@@ -234,7 +237,7 @@ def update_reminder(db: Session, reminder_id: int, user_id: int, data):
 # ALERT COUNT
 def get_pending_alert_count(db: Session, user_id: int):
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     return (
         db.query(Reminder)
@@ -250,7 +253,7 @@ def get_pending_alert_count(db: Session, user_id: int):
 # COMPLETE ALL REMINDERS
 def complete_all_reminders(db: Session, user_id: int):
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     reminders = (
         db.query(Reminder)
@@ -271,7 +274,7 @@ def complete_all_reminders(db: Session, user_id: int):
             plant_id=reminder.plant_id,
             action_type=reminder.type,
             note=reminder.title,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
 
         db.add(history)

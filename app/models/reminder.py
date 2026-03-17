@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from app.database.db import Base
 
 
@@ -18,19 +18,22 @@ class Reminder(Base):
 
     description = Column(String(500), nullable=True)
 
-    reminder_time = Column(DateTime, nullable=False)
+    # timezone aware
+    reminder_time = Column(DateTime(timezone=True), nullable=False, index=True)
 
-    type = Column(String(50), nullable=False)  
-    # daily / weekly
+    type = Column(String(50), nullable=False)  # daily / weekly
 
     day_of_week = Column(String(20), nullable=True)
 
-    status = Column(String(50), default="pending")
+    status = Column(String(20), default="pending", index=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc)
+    )
 
-    created_by = Column(String(100))  # storing users.email
+    created_by = Column(String(100))
 
     # relationships
     user = relationship("User")
-    plant = relationship("UserPlant",back_populates="reminders")
+    plant = relationship("UserPlant", back_populates="reminders")

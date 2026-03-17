@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime,timezone
 from app.database.db import Base
 
 
@@ -23,9 +23,9 @@ class UserPlant(Base):
 
     plant_image = Column(String(255), nullable=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User")
-    reminders = relationship("Reminder",back_populates="plant")
+    reminders = relationship("Reminder",back_populates="plant",cascade="all, delete-orphan",passive_deletes=True)
     care_history = relationship("CareHistory", back_populates="plant",cascade="all, delete")
     plant = relationship("Plant") 
