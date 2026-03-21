@@ -7,11 +7,25 @@ from app.models.user_plant import UserPlant
 
 
 # 🔥 HELPER: calculate next trigger
-def calculate_next_trigger(reminder_time, reminder_type):
+def calculate_next_trigger(reminder_time, reminder_type, day_of_week=None):
+
     if reminder_type == "daily":
         return reminder_time + timedelta(days=1)
-    elif reminder_type == "weekly":
-        return reminder_time + timedelta(days=7)
+
+    elif reminder_type == "weekly" and day_of_week:
+        days_map = {
+            "monday": 0, "tuesday": 1, "wednesday": 2,
+            "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6
+        }
+
+        today = reminder_time.weekday()
+        target = days_map.get(day_of_week.lower(), today)
+
+        delta = (target - today) % 7
+        delta = 7 if delta == 0 else delta
+
+        return reminder_time + timedelta(days=delta)
+
     return None
 
 
@@ -103,7 +117,6 @@ def get_due_reminders(db: Session):
     print("⏰ DEBUG NOW UTC:", now)
 
     reminders = db.query(Reminder).filter(
-        Reminder.status == "pending",
         Reminder.is_active == True,
         Reminder.next_trigger_time <= now
     ).all()
@@ -122,10 +135,9 @@ def mark_reminder_triggered(db: Session, reminder: Reminder):
     now = datetime.now(timezone.utc)
 
     reminder.last_triggered_at = now
-    reminder.is_sent_fcm = True
 
     # 🔁 Calculate next trigger
-    next_time = calculate_next_trigger(reminder.next_trigger_time, reminder.type)
+    next_time = calculate_next_trigger(now, reminder.type,reminder.day_of_week)
 
     if next_time:
         reminder.next_trigger_time = next_time
@@ -175,7 +187,17 @@ def skip_reminder(db: Session, reminder_id: int, user_id: int):
     if not reminder:
         return None
 
+    now = datetime.now(timezone.utc)
+
     reminder.status = "skipped"
+
+    # 🔥 MOVE TO NEXT CYCLE
+    next_time = calculate_next_trigger(now, reminder.type,reminder.day_of_week)
+
+    if next_time:
+        reminder.next_trigger_time = next_time
+    else:
+        reminder.is_active = False
 
     db.commit()
     db.refresh(reminder)
@@ -260,7 +282,7 @@ def get_pending_alert_count(db: Session, user_id: int):
 
     return db.query(Reminder).filter(
         Reminder.user_id == user_id,
-        Reminder.status == "pending",
+        Reminder.is_active == True,
         Reminder.next_trigger_time <= now
     ).count()
 
@@ -272,7 +294,7 @@ def complete_all_reminders(db: Session, user_id: int):
 
     reminders = db.query(Reminder).filter(
         Reminder.user_id == user_id,
-        Reminder.status == "pending",
+        Reminder.is_active == True,
         Reminder.next_trigger_time <= now
     ).all()
 
@@ -303,6 +325,6 @@ def get_pending_reminders(db: Session, user_id: int):
 
     return db.query(Reminder).filter(
         Reminder.user_id == user_id,
-        Reminder.status == "pending",
+        Reminder.is_active == True,
         Reminder.next_trigger_time <= now
     ).order_by(Reminder.next_trigger_time.asc()).all()

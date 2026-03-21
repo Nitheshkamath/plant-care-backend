@@ -1,4 +1,4 @@
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.background import AsyncIOScheduler
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
@@ -9,7 +9,7 @@ from app.services.fcm_service import send_fcm_to_user
 
 def run_scheduler():
 
-    scheduler = BackgroundScheduler()
+    scheduler = AsyncIOScheduler()
 
     def job():
         print("\n🔥 SCHEDULER RUNNING ------------------------")

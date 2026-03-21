@@ -3,6 +3,7 @@ import json
 import firebase_admin
 from firebase_admin import credentials, messaging
 from app.models.device import Device
+from app.services.reminder_service import get_pending_alert_count
 
 
 # 🔥 Load Firebase JSON from ENV
@@ -32,11 +33,20 @@ def send_fcm_to_user(db, user_id, title, body):
     if not tokens:
         return {"message": "No active devices"}
 
+    # 🔥 ADD THIS
+    pending_count = get_pending_alert_count(db, user_id)
+
     message = messaging.MulticastMessage(
         notification=messaging.Notification(
             title=title,
             body=body,
         ),
+        data={
+            "type": "reminder",
+            "title": title,
+            "body": body,
+            "badge": str(pending_count)  # 🔥 IMPORTANT
+        },
         tokens=tokens,
     )
 
