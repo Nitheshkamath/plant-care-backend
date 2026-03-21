@@ -1,17 +1,26 @@
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from app.models.reminder import Reminder
 from app.models.care_histroy import CareHistory
 from app.schemas.reminder_schema import ReminderCreate
 from app.models.user_plant import UserPlant
-from app.models.plants import Plant
+
+
+# 🔥 HELPER: calculate next trigger
+def calculate_next_trigger(reminder_time, reminder_type):
+    if reminder_type == "daily":
+        return reminder_time + timedelta(days=1)
+    elif reminder_type == "weekly":
+        return reminder_time + timedelta(days=7)
+    return None
 
 
 # CREATE REMINDER
 def create_reminder(db: Session, user, data: ReminderCreate):
 
-    # 🔥 FIX: ensure UTC
     reminder_time = data.reminder_time
+
+    # ✅ Ensure UTC
     if reminder_time.tzinfo is None:
         reminder_time = reminder_time.replace(tzinfo=timezone.utc)
     else:
@@ -27,17 +36,19 @@ def create_reminder(db: Session, user, data: ReminderCreate):
     ).first()
 
     if existing:
-        return {"error": "Reminder already exists for this plant at the same time"}
+        return {"error": "Reminder already exists"}
 
     reminder = Reminder(
         user_id=user.id,
         plant_id=data.plant_id,
         title=data.title,
         description=data.description,
-        reminder_time=reminder_time,  # ✅ FIXED
+        reminder_time=reminder_time,
         type=data.type,
         day_of_week=data.day_of_week,
         status="pending",
+        is_active=True,
+        next_trigger_time=reminder_time,  # 🔥 IMPORTANT
         created_by=user.email
     )
 
@@ -65,7 +76,7 @@ def get_user_reminders(db: Session, user_id: int):
         image = plant.plant_image
 
         if not image and plant.plant:
-            image = plant.plant.image_url 
+            image = plant.plant.image_url
 
         result.append({
             "id": reminder.id,
@@ -76,47 +87,60 @@ def get_user_reminders(db: Session, user_id: int):
             "description": reminder.description,
             "type": reminder.type,
             "day_of_week": reminder.day_of_week,
-            "reminder_time": reminder.reminder_time.isoformat(),  # ✅ FIX
-            "created_at": reminder.created_at.isoformat(),        # ✅ FIX
+            "reminder_time": reminder.reminder_time.isoformat(),
+            "next_trigger_time": reminder.next_trigger_time.isoformat() if reminder.next_trigger_time else None,
+            "created_at": reminder.created_at.isoformat(),
             "created_by": reminder.created_by
         })
 
     return result
 
 
-# GET PENDING REMINDERS
-def get_pending_reminders(db: Session, user_id: int):
+# 🔥 FCM / CRON: GET MISSED REMINDERS
+def get_due_reminders(db: Session):
 
     now = datetime.now(timezone.utc)
 
-    return (
-        db.query(Reminder)
-        .filter(
-            Reminder.user_id == user_id,
-            Reminder.status == "pending",
-            Reminder.reminder_time <= now
-        )
-        .order_by(Reminder.reminder_time.asc())
-        .all()
-    )
+    reminders = db.query(Reminder).filter(
+        Reminder.next_trigger_time <= now,
+        Reminder.is_active == True
+    ).all()
+
+    return reminders
+
+
+# 🔥 UPDATE AFTER TRIGGER (LOCAL OR FCM)
+def mark_reminder_triggered(db: Session, reminder: Reminder):
+
+    now = datetime.now(timezone.utc)
+
+    reminder.last_triggered_at = now
+    reminder.is_sent_fcm = True
+
+    # 🔁 Calculate next trigger
+    next_time = calculate_next_trigger(reminder.next_trigger_time, reminder.type)
+
+    if next_time:
+        reminder.next_trigger_time = next_time
+    else:
+        reminder.is_active = False  # one-time completed
+
+    db.commit()
 
 
 # COMPLETE REMINDER
 def complete_reminder(db: Session, reminder_id: int, user_id: int):
 
-    reminder = (
-        db.query(Reminder)
-        .filter(
-            Reminder.id == reminder_id,
-            Reminder.user_id == user_id
-        )
-        .first()
-    )
+    reminder = db.query(Reminder).filter(
+        Reminder.id == reminder_id,
+        Reminder.user_id == user_id
+    ).first()
 
     if not reminder:
         return None
 
     reminder.status = "completed"
+    reminder.is_active = False
 
     history = CareHistory(
         user_id=user_id,
@@ -127,7 +151,6 @@ def complete_reminder(db: Session, reminder_id: int, user_id: int):
     )
 
     db.add(history)
-
     db.commit()
     db.refresh(reminder)
 
@@ -137,14 +160,10 @@ def complete_reminder(db: Session, reminder_id: int, user_id: int):
 # SKIP REMINDER
 def skip_reminder(db: Session, reminder_id: int, user_id: int):
 
-    reminder = (
-        db.query(Reminder)
-        .filter(
-            Reminder.id == reminder_id,
-            Reminder.user_id == user_id
-        )
-        .first()
-    )
+    reminder = db.query(Reminder).filter(
+        Reminder.id == reminder_id,
+        Reminder.user_id == user_id
+    ).first()
 
     if not reminder:
         return None
@@ -160,14 +179,10 @@ def skip_reminder(db: Session, reminder_id: int, user_id: int):
 # DELETE REMINDER
 def delete_reminder(db: Session, reminder_id: int, user_id: int):
 
-    reminder = (
-        db.query(Reminder)
-        .filter(
-            Reminder.id == reminder_id,
-            Reminder.user_id == user_id
-        )
-        .first()
-    )
+    reminder = db.query(Reminder).filter(
+        Reminder.id == reminder_id,
+        Reminder.user_id == user_id
+    ).first()
 
     if reminder:
         db.delete(reminder)
@@ -187,7 +202,7 @@ def update_reminder(db: Session, reminder_id: int, user_id: int, data):
     if not reminder:
         return None
 
-    # 🔥 FIX: handle UTC conversion
+    # ✅ UTC FIX
     if data.reminder_time is not None:
         reminder_time = data.reminder_time
 
@@ -198,23 +213,21 @@ def update_reminder(db: Session, reminder_id: int, user_id: int, data):
     else:
         reminder_time = reminder.reminder_time
 
-    plant_id = data.plant_id if data.plant_id is not None else reminder.plant_id
-    reminder_type = data.type if data.type is not None else reminder.type
-
     # ⭐ DUPLICATE CHECK
     duplicate = db.query(Reminder).filter(
         Reminder.user_id == user_id,
-        Reminder.plant_id == plant_id,
-        Reminder.type == reminder_type,
+        Reminder.plant_id == reminder.plant_id,
+        Reminder.type == reminder.type,
         Reminder.reminder_time == reminder_time,
         Reminder.id != reminder_id
     ).first()
 
     if duplicate:
-        return {"error": "Another reminder already exists with same plant and time"}
+        return {"error": "Duplicate reminder exists"}
 
-    # UPDATE FIELDS
-    reminder.plant_id = plant_id
+    # UPDATE
+    reminder.reminder_time = reminder_time
+    reminder.next_trigger_time = reminder_time  # 🔥 IMPORTANT RESET
 
     if data.title is not None:
         reminder.title = data.title
@@ -222,8 +235,8 @@ def update_reminder(db: Session, reminder_id: int, user_id: int, data):
     if data.description is not None:
         reminder.description = data.description
 
-    reminder.reminder_time = reminder_time  # ✅ FIXED
-    reminder.type = reminder_type
+    if data.type is not None:
+        reminder.type = data.type
 
     if data.day_of_week is not None:
         reminder.day_of_week = data.day_of_week
@@ -239,15 +252,11 @@ def get_pending_alert_count(db: Session, user_id: int):
 
     now = datetime.now(timezone.utc)
 
-    return (
-        db.query(Reminder)
-        .filter(
-            Reminder.user_id == user_id,
-            Reminder.status == "pending",
-            Reminder.reminder_time <= now
-        )
-        .count()
-    )
+    return db.query(Reminder).filter(
+        Reminder.user_id == user_id,
+        Reminder.status == "pending",
+        Reminder.next_trigger_time <= now
+    ).count()
 
 
 # COMPLETE ALL REMINDERS
@@ -255,19 +264,16 @@ def complete_all_reminders(db: Session, user_id: int):
 
     now = datetime.now(timezone.utc)
 
-    reminders = (
-        db.query(Reminder)
-        .filter(
-            Reminder.user_id == user_id,
-            Reminder.status == "pending",
-            Reminder.reminder_time <= now
-        )
-        .all()
-    )
+    reminders = db.query(Reminder).filter(
+        Reminder.user_id == user_id,
+        Reminder.status == "pending",
+        Reminder.next_trigger_time <= now
+    ).all()
 
     for reminder in reminders:
 
         reminder.status = "completed"
+        reminder.is_active = False
 
         history = CareHistory(
             user_id=user_id,
