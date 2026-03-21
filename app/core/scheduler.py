@@ -1,4 +1,4 @@
-from apscheduler.schedulers.background import AsyncIOScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
