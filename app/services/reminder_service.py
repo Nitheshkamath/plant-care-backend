@@ -137,7 +137,7 @@ def mark_reminder_triggered(db: Session, reminder: Reminder):
     reminder.last_triggered_at = now
 
     # 🔁 Calculate next trigger
-    next_time = calculate_next_trigger(now, reminder.type,reminder.day_of_week)
+    next_time = calculate_next_trigger(reminder.next_trigger_time,reminder.type,reminder.day_of_week)
 
     if next_time:
         reminder.next_trigger_time = next_time
@@ -181,21 +181,27 @@ def skip_reminder(db: Session, reminder_id: int, user_id: int):
 
     reminder = db.query(Reminder).filter(
         Reminder.id == reminder_id,
-        Reminder.user_id == user_id
+        Reminder.user_id == user_id,
     ).first()
 
     if not reminder:
         return None
 
-    now = datetime.now(timezone.utc)
-
     reminder.status = "skipped"
 
-    # 🔥 MOVE TO NEXT CYCLE
-    next_time = calculate_next_trigger(now, reminder.type,reminder.day_of_week)
+    # 🔥 REMOVE FROM ALERTS
+    reminder.last_triggered_at = None
+
+    # 🔁 MOVE TO NEXT CYCLE
+    next_time = calculate_next_trigger(
+        reminder.next_trigger_time,
+        reminder.type,
+        reminder.day_of_week
+    )
 
     if next_time:
         reminder.next_trigger_time = next_time
+        reminder.is_active = True   # ensure still active
     else:
         reminder.is_active = False
 
@@ -203,7 +209,6 @@ def skip_reminder(db: Session, reminder_id: int, user_id: int):
     db.refresh(reminder)
 
     return reminder
-
 
 # DELETE REMINDER
 def delete_reminder(db: Session, reminder_id: int, user_id: int):
@@ -278,11 +283,9 @@ def update_reminder(db: Session, reminder_id: int, user_id: int, data):
 # ALERT COUNT (FIXED)
 def get_pending_alert_count(db: Session, user_id: int):
 
-    now = datetime.now(timezone.utc)
-
     return db.query(Reminder).filter(
         Reminder.user_id == user_id,
-        Reminder.is_active == True,
+        Reminder.status == "pending",
         Reminder.last_triggered_at != None
     ).count()
 
@@ -294,8 +297,8 @@ def complete_all_reminders(db: Session, user_id: int):
 
     reminders = db.query(Reminder).filter(
         Reminder.user_id == user_id,
-        Reminder.is_active == True,
-        Reminder.next_trigger_time <= now
+        Reminder.status == "pending",
+        Reminder.last_triggered_at != None
     ).all()
 
     for reminder in reminders:
@@ -321,10 +324,8 @@ def complete_all_reminders(db: Session, user_id: int):
 # GET PENDING (FOR UI)
 def get_pending_reminders(db: Session, user_id: int):
 
-    now = datetime.now(timezone.utc)
-
     return db.query(Reminder).filter(
         Reminder.user_id == user_id,
-        Reminder.is_active == True,
-        Reminder.next_trigger_time <= now
-    ).order_by(Reminder.next_trigger_time.asc()).all()
+        Reminder.status == "pending",
+        Reminder.last_triggered_at != None
+    ).order_by(Reminder.last_triggered_at.desc()).all()
