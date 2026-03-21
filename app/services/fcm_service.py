@@ -1,19 +1,22 @@
 import os
+import json
 import firebase_admin
 from firebase_admin import credentials, messaging
-from dotenv import load_dotenv
 from app.models.device import Device
 
-load_dotenv()
 
-# 🔥 Initialize Firebase safely
-firebase_path = os.getenv("FIREBASE_CREDENTIALS_PATH")
+# 🔥 Load Firebase JSON from ENV
+firebase_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
 
-if not firebase_path:
-    raise Exception("FIREBASE_CREDENTIALS_PATH not set in .env")
+if not firebase_json:
+    raise Exception("FIREBASE_CREDENTIALS_JSON not set")
 
+# 🔥 Convert JSON string → dict
+cred_dict = json.loads(firebase_json)
+
+# 🔥 Initialize Firebase safely (only once)
 if not firebase_admin._apps:
-    cred = credentials.Certificate(firebase_path)
+    cred = credentials.Certificate(cred_dict)
     firebase_admin.initialize_app(cred)
 
 
@@ -24,7 +27,7 @@ def send_fcm_to_user(db, user_id, title, body):
         Device.is_active == 1
     ).all()
 
-    tokens = [d.fcm_token for d in devices]
+    tokens = [d.fcm_token for d in devices if d.fcm_token]
 
     if not tokens:
         return {"message": "No active devices"}

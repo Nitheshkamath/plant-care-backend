@@ -104,12 +104,12 @@ def edit_reminder(
 
     return updated
 
-@router.get("/pending")
-def pending_reminders(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    return get_pending_reminders(db, current_user.id)
+# @router.get("/pending")
+# def pending_reminders(
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user)
+# ):
+#     return get_pending_reminders(db, current_user.id)
 
 
 @router.put("/{reminder_id}/complete")
