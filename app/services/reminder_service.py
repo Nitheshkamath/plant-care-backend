@@ -288,3 +288,19 @@ def complete_all_reminders(db: Session, user_id: int):
     db.commit()
 
     return {"completed": len(reminders)}
+
+
+def get_pending_reminders(db: Session, user_id: int):
+
+    now = datetime.now(timezone.utc)
+
+    return (
+        db.query(Reminder)
+        .filter(
+            Reminder.user_id == user_id,
+            Reminder.status == "pending",
+            Reminder.reminder_time <= now
+        )
+        .order_by(Reminder.reminder_time.asc())
+        .all()
+    )

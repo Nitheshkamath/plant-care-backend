@@ -12,7 +12,8 @@ from app.services.reminder_service import (
     skip_reminder,
     complete_reminder,
     get_pending_alert_count,
-    complete_all_reminders
+    complete_all_reminders,
+    get_pending_reminders
 )
 from app.core.security import get_current_user
 from app.models.user import User
@@ -104,12 +105,12 @@ def edit_reminder(
 
     return updated
 
-# @router.get("/pending")
-# def pending_reminders(
-#     db: Session = Depends(get_db),
-#     current_user: User = Depends(get_current_user)
-# ):
-#     return get_pending_reminders(db, current_user.id)
+@router.get("/pending")
+def pending_reminders(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return get_pending_reminders(db, current_user.id)
 
 
 @router.put("/{reminder_id}/complete")
