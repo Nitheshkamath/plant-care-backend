@@ -10,7 +10,6 @@ from app.services.reminder_service import (
     delete_reminder,
     update_reminder,
     skip_reminder,
-    get_pending_reminders,
     complete_reminder,
     get_pending_alert_count,
     complete_all_reminders
