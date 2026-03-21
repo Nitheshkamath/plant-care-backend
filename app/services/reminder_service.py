@@ -96,20 +96,27 @@ def get_user_reminders(db: Session, user_id: int):
     return result
 
 
-# 🔥 FCM / CRON: GET MISSED REMINDERS
+# 🔥 FCM / CRON: GET DUE REMINDERS (FIXED)
 def get_due_reminders(db: Session):
 
     now = datetime.now(timezone.utc)
+    print("⏰ DEBUG NOW UTC:", now)
 
     reminders = db.query(Reminder).filter(
-        Reminder.next_trigger_time <= now,
-        Reminder.is_active == True
+        Reminder.status == "pending",
+        Reminder.is_active == True,
+        Reminder.next_trigger_time <= now
     ).all()
+
+    print("📦 DEBUG FOUND:", len(reminders))
+
+    for r in reminders:
+        print("➡️ DEBUG REMINDER:", r.id, r.next_trigger_time, r.status)
 
     return reminders
 
 
-# 🔥 UPDATE AFTER TRIGGER (LOCAL OR FCM)
+# 🔥 UPDATE AFTER TRIGGER
 def mark_reminder_triggered(db: Session, reminder: Reminder):
 
     now = datetime.now(timezone.utc)
@@ -123,7 +130,7 @@ def mark_reminder_triggered(db: Session, reminder: Reminder):
     if next_time:
         reminder.next_trigger_time = next_time
     else:
-        reminder.is_active = False  # one-time completed
+        reminder.is_active = False
 
     db.commit()
 
@@ -225,9 +232,8 @@ def update_reminder(db: Session, reminder_id: int, user_id: int, data):
     if duplicate:
         return {"error": "Duplicate reminder exists"}
 
-    # UPDATE
     reminder.reminder_time = reminder_time
-    reminder.next_trigger_time = reminder_time  # 🔥 IMPORTANT RESET
+    reminder.next_trigger_time = reminder_time  # 🔥 RESET
 
     if data.title is not None:
         reminder.title = data.title
@@ -247,7 +253,7 @@ def update_reminder(db: Session, reminder_id: int, user_id: int, data):
     return reminder
 
 
-# ALERT COUNT
+# ALERT COUNT (FIXED)
 def get_pending_alert_count(db: Session, user_id: int):
 
     now = datetime.now(timezone.utc)
@@ -259,7 +265,7 @@ def get_pending_alert_count(db: Session, user_id: int):
     ).count()
 
 
-# COMPLETE ALL REMINDERS
+# COMPLETE ALL
 def complete_all_reminders(db: Session, user_id: int):
 
     now = datetime.now(timezone.utc)
@@ -290,17 +296,13 @@ def complete_all_reminders(db: Session, user_id: int):
     return {"completed": len(reminders)}
 
 
+# GET PENDING (FOR UI)
 def get_pending_reminders(db: Session, user_id: int):
 
     now = datetime.now(timezone.utc)
 
-    return (
-        db.query(Reminder)
-        .filter(
-            Reminder.user_id == user_id,
-            Reminder.status == "pending",
-            Reminder.reminder_time <= now
-        )
-        .order_by(Reminder.reminder_time.asc())
-        .all()
-    )
+    return db.query(Reminder).filter(
+        Reminder.user_id == user_id,
+        Reminder.status == "pending",
+        Reminder.next_trigger_time <= now
+    ).order_by(Reminder.next_trigger_time.asc()).all()
