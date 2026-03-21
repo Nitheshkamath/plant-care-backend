@@ -283,7 +283,7 @@ def get_pending_alert_count(db: Session, user_id: int):
     return db.query(Reminder).filter(
         Reminder.user_id == user_id,
         Reminder.is_active == True,
-        Reminder.next_trigger_time <= now
+        Reminder.last_triggered_at != None
     ).count()
 
 
