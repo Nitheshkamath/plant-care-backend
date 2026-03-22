@@ -26,5 +26,5 @@ class Device(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc)
     )
-
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     user = relationship("User")
