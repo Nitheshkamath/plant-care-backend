@@ -30,17 +30,16 @@ def run_scheduler():
                 print(f"   🕒 Reminder Time (UTC): {r.reminder_time}")
 
                 try:
-                    # 🔔 SEND FCM
+                    # 🔥 FIXED: pass FULL reminder object
                     res = send_fcm_to_user(
                         db,
                         r.user_id,
-                        r.title,
-                        r.description
+                        r   # ✅ IMPORTANT FIX
                     )
 
                     print("📲 FCM RESPONSE:", res)
 
-                    # ✅ ONLY MARK IF SUCCESS
+                    # ✅ mark only if success
                     if isinstance(res, list) and any(
                         item.get("status") == "success" for item in res
                     ):
