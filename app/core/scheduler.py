@@ -1,4 +1,4 @@
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
@@ -9,7 +9,7 @@ from app.services.fcm_service import send_fcm_to_user
 
 def run_scheduler():
 
-    scheduler = AsyncIOScheduler()
+    scheduler = BackgroundScheduler()
 
     def job():
         print("\n🔥 SCHEDULER RUNNING ------------------------")
@@ -40,10 +40,14 @@ def run_scheduler():
 
                     print("📲 FCM RESPONSE:", res)
 
-                    # ✅ MARK AS TRIGGERED
-                    mark_reminder_triggered(db, r)
-
-                    print(f"✅ Reminder {r.id} marked as triggered")
+                    # ✅ ONLY MARK IF SUCCESS
+                    if isinstance(res, list) and any(
+                        item.get("status") == "success" for item in res
+                    ):
+                        mark_reminder_triggered(db, r)
+                        print(f"✅ Reminder {r.id} marked as triggered")
+                    else:
+                        print(f"⚠️ Reminder {r.id} NOT marked (FCM failed)")
 
                 except Exception as e:
                     print(f"❌ FCM ERROR for reminder {r.id}:", str(e))

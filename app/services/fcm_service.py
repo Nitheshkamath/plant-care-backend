@@ -33,26 +33,27 @@ def send_fcm_to_user(db, user_id, title, body):
     if not tokens:
         return {"message": "No active devices"}
 
-    # 🔥 ADD THIS
-    pending_count = get_pending_alert_count(db, user_id)
+    badge_count = get_pending_alert_count(db, user_id)
 
-    message = messaging.MulticastMessage(
-        notification=messaging.Notification(
-            title=title,
-            body=body,
-        ),
-        data={
-            "type": "reminder",
-            "title": title,
-            "body": body,
-            "badge": str(pending_count)  # 🔥 IMPORTANT
-        },
-        tokens=tokens,
-    )
+    results = []
 
-    response = messaging.send_multicast(message)
+    for token in tokens:
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title=title,
+                body=body,
+            ),
+            data={
+                "badge": str(badge_count),
+                "type": "reminder"
+            },
+            token=token,
+        )
 
-    return {
-        "success": response.success_count,
-        "failure": response.failure_count
-    }
+        try:
+            messaging.send(message)
+            results.append({"token": token, "status": "success"})
+        except Exception as e:
+            results.append({"token": token, "error": str(e)})
+
+    return results
