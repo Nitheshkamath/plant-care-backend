@@ -65,7 +65,7 @@ def register_device(
             user_id=user.id,
             fcm_token=token,
             device_type=data.device_type,
-            is_active=True,
+            is_active=1,
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc)
         )
