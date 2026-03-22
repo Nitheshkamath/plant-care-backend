@@ -26,7 +26,6 @@ def send_fcm_to_user(db, user_id, reminder):
 
     print(f"\n📤 Sending FCM for user {user_id} | Reminder {reminder.id}")
 
-    # 🔍 Get user devices
     devices = db.query(Device).filter(
         Device.user_id == user_id,
         Device.is_active == 1
@@ -40,7 +39,7 @@ def send_fcm_to_user(db, user_id, reminder):
         print("⚠️ No active devices")
         return {"message": "No active devices"}
 
-    # 🌿 Get plant name safely
+    # 🌿 Plant name
     plant_name = "Your Plant"
     try:
         if reminder.plant:
@@ -48,7 +47,7 @@ def send_fcm_to_user(db, user_id, reminder):
     except Exception as e:
         print("⚠️ Plant fetch error:", e)
 
-    # 🌿 Emoji mapping
+    # 🌿 Emoji
     emoji_map = {
         "watering": "💧",
         "fertilizing": "🌱",
@@ -60,7 +59,7 @@ def send_fcm_to_user(db, user_id, reminder):
 
     emoji = emoji_map.get(reminder.title, "🌿")
 
-    # 🔥 Notification content (BEST FORMAT)
+    # 🔥 Notification
     title = f"{emoji} Time to take care of your plant"
 
     body = f"{reminder.title.capitalize()} your {plant_name}"
@@ -71,12 +70,10 @@ def send_fcm_to_user(db, user_id, reminder):
     print("📝 Title:", title)
     print("📝 Body:", body)
 
-    # 🔔 Badge count
     badge_count = get_pending_alert_count(db, user_id)
 
     results = []
 
-    # 🚀 Send notification to each device
     for token in tokens:
 
         message = messaging.Message(
@@ -103,11 +100,25 @@ def send_fcm_to_user(db, user_id, reminder):
             })
 
         except Exception as e:
-            print(f"❌ Error sending to {token}:", str(e))
+
+            error_msg = str(e)
+            print(f"❌ Error sending to {token}: {error_msg}")
+
+            # 🔥 REMOVE INVALID TOKEN
+            if "Requested entity was not found" in error_msg:
+                print(f"🗑 Removing invalid token: {token}")
+
+                device = db.query(Device).filter(
+                    Device.fcm_token == token
+                ).first()
+
+                if device:
+                    device.is_active = 0
+                    db.commit()
 
             results.append({
                 "token": token,
-                "error": str(e)
+                "error": error_msg
             })
 
     return results
