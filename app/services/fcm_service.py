@@ -21,7 +21,7 @@ if not firebase_admin._apps:
     firebase_admin.initialize_app(cred)
 
 
-def send_fcm_to_user(db, user_id, title, body):
+def send_fcm_to_user(db, user_id, reminder):
 
     devices = db.query(Device).filter(
         Device.user_id == user_id,
@@ -33,11 +33,39 @@ def send_fcm_to_user(db, user_id, title, body):
     if not tokens:
         return {"message": "No active devices"}
 
+    # 🔥 Get plant name safely
+    plant_name = "Your Plant"
+    if reminder.plant:
+        plant_name = reminder.plant.plant_name
+
+    # 🔥 Emoji mapping
+    emoji_map = {
+        "watering": "💧",
+        "fertilizing": "🌱",
+        "trimming": "✂️",
+        "repotting": "🪴",
+        "sunlight_check": "☀️",
+        "pest_inspection": "🐛",
+    }
+
+    emoji = emoji_map.get(reminder.title, "🌿")
+
+    # 🔥 Notification content
+    title = f"{emoji} Time to take care of your plant"
+    
+    body = (
+        reminder.description
+        if reminder.description
+        else f"{reminder.title.capitalize()} - {plant_name}"
+    )
+
+    # 🔥 Badge count
     badge_count = get_pending_alert_count(db, user_id)
 
     results = []
 
     for token in tokens:
+
         message = messaging.Message(
             notification=messaging.Notification(
                 title=title,
@@ -45,7 +73,9 @@ def send_fcm_to_user(db, user_id, title, body):
             ),
             data={
                 "badge": str(badge_count),
-                "type": "reminder"
+                "type": "reminder",
+                "plant_name": plant_name,
+                "action": reminder.title
             },
             token=token,
         )
