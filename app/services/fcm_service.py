@@ -15,14 +15,18 @@ if not firebase_json:
 # 🔥 Convert JSON string → dict
 cred_dict = json.loads(firebase_json)
 
-# 🔥 Initialize Firebase safely (only once)
+# 🔥 Initialize Firebase (only once)
 if not firebase_admin._apps:
     cred = credentials.Certificate(cred_dict)
     firebase_admin.initialize_app(cred)
+    print("🔥 Firebase initialized successfully")
 
 
 def send_fcm_to_user(db, user_id, reminder):
 
+    print(f"\n📤 Sending FCM for user {user_id} | Reminder {reminder.id}")
+
+    # 🔍 Get user devices
     devices = db.query(Device).filter(
         Device.user_id == user_id,
         Device.is_active == 1
@@ -30,15 +34,21 @@ def send_fcm_to_user(db, user_id, reminder):
 
     tokens = [d.fcm_token for d in devices if d.fcm_token]
 
+    print("📱 Tokens found:", tokens)
+
     if not tokens:
+        print("⚠️ No active devices")
         return {"message": "No active devices"}
 
-    # 🔥 Get plant name safely
+    # 🌿 Get plant name safely
     plant_name = "Your Plant"
-    if reminder.plant:
-        plant_name = reminder.plant.plant_name
+    try:
+        if reminder.plant:
+            plant_name = reminder.plant.plant_name
+    except Exception as e:
+        print("⚠️ Plant fetch error:", e)
 
-    # 🔥 Emoji mapping
+    # 🌿 Emoji mapping
     emoji_map = {
         "watering": "💧",
         "fertilizing": "🌱",
@@ -50,20 +60,23 @@ def send_fcm_to_user(db, user_id, reminder):
 
     emoji = emoji_map.get(reminder.title, "🌿")
 
-    # 🔥 Notification content
+    # 🔥 Notification content (BEST FORMAT)
     title = f"{emoji} Time to take care of your plant"
-    
-    body = (
-        reminder.description
-        if reminder.description
-        else f"{reminder.title.capitalize()} - {plant_name}"
-    )
 
-    # 🔥 Badge count
+    body = f"{reminder.title.capitalize()} your {plant_name}"
+
+    if reminder.description:
+        body += f"\n{reminder.description}"
+
+    print("📝 Title:", title)
+    print("📝 Body:", body)
+
+    # 🔔 Badge count
     badge_count = get_pending_alert_count(db, user_id)
 
     results = []
 
+    # 🚀 Send notification to each device
     for token in tokens:
 
         message = messaging.Message(
@@ -81,9 +94,20 @@ def send_fcm_to_user(db, user_id, reminder):
         )
 
         try:
-            messaging.send(message)
-            results.append({"token": token, "status": "success"})
+            response = messaging.send(message)
+            print(f"✅ Sent to {token}: {response}")
+
+            results.append({
+                "token": token,
+                "status": "success"
+            })
+
         except Exception as e:
-            results.append({"token": token, "error": str(e)})
+            print(f"❌ Error sending to {token}:", str(e))
+
+            results.append({
+                "token": token,
+                "error": str(e)
+            })
 
     return results
