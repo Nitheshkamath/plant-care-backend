@@ -46,7 +46,7 @@ def register_device(
     if existing_token:
         # 🔁 Reassign token safely
         existing_token.user_id = user.id
-        existing_token.is_active = True
+        existing_token.is_active = 1
         existing_token.device_type = data.device_type
         existing_token.updated_at = datetime.now(timezone.utc)
 
@@ -57,7 +57,7 @@ def register_device(
         db.query(Device).filter(
             Device.user_id == user.id
         ).update({
-            "is_active": False
+            "is_active": 0
         })
 
         # ✅ Add new device
