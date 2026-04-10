@@ -61,7 +61,7 @@ async def add_my_plant(
     # ✅ CLOUDINARY UPLOAD
     if plant_image:
 
-        if plant_image.content_type not in ["image/jpeg", "image/png"]:
+        if not plant_image.content_type.startswith("image/"):
             raise HTTPException(status_code=400, detail="Invalid file type")
 
         try:
@@ -188,7 +188,7 @@ async def update_my_plant(
     # ✅ CLOUDINARY UPDATE
     if plant_image:
 
-        if plant_image.content_type not in ["image/jpeg", "image/png"]:
+        if not plant_image.content_type.startswith("image/"):
             raise HTTPException(status_code=400, detail="Invalid file type")
 
         try:
