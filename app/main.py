@@ -12,7 +12,8 @@ from app.routes.devices_router import router as device_router  # 🔥 NEW
 
 # ---------- Core ----------
 from app.database.base import create_tables
-from app.core.scheduler import run_scheduler  # 🔥 NEW
+from app.core.scheduler import run_scheduler
+from app.core import cloudinary_config 
 
 app = FastAPI()
 
@@ -48,6 +49,3 @@ app.include_router(care_histroy_routes.router)
 app.include_router(user_plant_routes.router, tags=["User plants"])
 app.include_router(device_router)  # 🔥 NEW (FCM)
 
-
-# ---------- Static ----------
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")

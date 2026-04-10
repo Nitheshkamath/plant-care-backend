@@ -1,9 +1,9 @@
-import os
-from uuid import uuid4
 from typing import Generator, List
 
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy.orm import Session
+
+import cloudinary.uploader 
 
 from app.database.db import SessionLocal
 from app.models.user_plant import UserPlant
@@ -16,11 +16,6 @@ router = APIRouter(
     prefix="/my-plants",
     tags=["My Plants"]
 )
-
-UPLOAD_FOLDER = "uploads/plants"
-
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
 
 # DATABASE DEPENDENCY
 def get_db() -> Generator:
@@ -63,15 +58,18 @@ async def add_my_plant(
 
     image_path = None
 
+    # ✅ CLOUDINARY UPLOAD
     if plant_image:
 
-        filename = f"{uuid4()}_{plant_image.filename}"
-        file_location = f"{UPLOAD_FOLDER}/{filename}"
+        if plant_image.content_type not in ["image/jpeg", "image/png"]:
+            raise HTTPException(status_code=400, detail="Invalid file type")
 
-        with open(file_location, "wb") as buffer:
-            buffer.write(await plant_image.read())
+        try:
+            result = cloudinary.uploader.upload(plant_image.file)
+            image_path = result["secure_url"]
 
-        image_path = file_location
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     new_plant = UserPlant(
         user_id=current_user.id,
@@ -153,7 +151,7 @@ async def update_my_plant(
     if not plant:
         raise HTTPException(status_code=404, detail="Plant not found")
 
-    # ⭐ DUPLICATE CHECK (excluding current plant)
+    # ⭐ DUPLICATE CHECK
     duplicate = db.query(UserPlant).filter(
         UserPlant.user_id == current_user.id,
         UserPlant.plant_name == plant_name,
@@ -187,15 +185,18 @@ async def update_my_plant(
     plant.location = location
     plant.watering_schedule = watering_schedule
 
+    # ✅ CLOUDINARY UPDATE
     if plant_image:
 
-        filename = f"{uuid4()}_{plant_image.filename}"
-        file_location = f"{UPLOAD_FOLDER}/{filename}"
+        if plant_image.content_type not in ["image/jpeg", "image/png"]:
+            raise HTTPException(status_code=400, detail="Invalid file type")
 
-        with open(file_location, "wb") as buffer:
-            buffer.write(await plant_image.read())
+        try:
+            result = cloudinary.uploader.upload(plant_image.file)
+            plant.plant_image = result["secure_url"]
 
-        plant.plant_image = file_location
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     db.commit()
     db.refresh(plant)
@@ -221,14 +222,15 @@ def delete_my_plant(
     if not plant:
         raise HTTPException(status_code=404, detail="Plant not found")
 
-    if plant.plant_image and os.path.exists(plant.plant_image):
-        os.remove(plant.plant_image)
+    # ❌ Removed local file deletion (not needed anymore)
 
     db.delete(plant)
     db.commit()
 
     return {"message": "Plant deleted successfully"}
 
+
+# 🌿 ADD FROM LIBRARY
 @router.post("/add-from-library/{plant_id}")
 def add_from_library(
     plant_id: int,
@@ -240,7 +242,7 @@ def add_from_library(
 
     if not plant:
         raise HTTPException(status_code=404, detail="Plant not found")
-    
+
     existing = db.query(UserPlant).filter(
         UserPlant.user_id == current_user.id,
         UserPlant.plant_library_id == plant_id
@@ -252,7 +254,6 @@ def add_from_library(
             detail="Plant already exists in your garden"
         )
 
-    # ✅ CREATE USER PLANT
     user_plant = UserPlant(
         user_id=current_user.id,
         plant_library_id=plant.id,
