@@ -63,9 +63,12 @@ async def add_my_plant(
         print("NEW CODE RUNNING")
         print("CONTENT TYPE:", plant_image.content_type)
 
-        if not plant_image.content_type.startswith("image/"):
-            raise HTTPException(status_code=400, detail="Invalid file type")
+        
 
+        filename = plant_image.filename or ""
+
+        if not filename.lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".heic")):
+            raise HTTPException(status_code=400, detail="Invalid file type")
         try:
             result = cloudinary.uploader.upload(plant_image.file)
             image_path = result["secure_url"]
@@ -193,7 +196,9 @@ async def update_my_plant(
         print("NEW CODE RUNNING")
         print("CONTENT TYPE:", plant_image.content_type)
 
-        if not plant_image.content_type.startswith("image/"):
+        filename = plant_image.filename or ""
+
+        if not filename.lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".heic")):
             raise HTTPException(status_code=400, detail="Invalid file type")
 
         try:
