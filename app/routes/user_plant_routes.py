@@ -60,6 +60,8 @@ async def add_my_plant(
 
     # ✅ CLOUDINARY UPLOAD
     if plant_image:
+        print("NEW CODE RUNNING")
+        print("CONTENT TYPE:", plant_image.content_type)
 
         if not plant_image.content_type.startswith("image/"):
             raise HTTPException(status_code=400, detail="Invalid file type")
@@ -187,6 +189,9 @@ async def update_my_plant(
 
     # ✅ CLOUDINARY UPDATE
     if plant_image:
+
+        print("NEW CODE RUNNING")
+        print("CONTENT TYPE:", plant_image.content_type)
 
         if not plant_image.content_type.startswith("image/"):
             raise HTTPException(status_code=400, detail="Invalid file type")
