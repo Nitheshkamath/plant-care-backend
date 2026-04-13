@@ -12,6 +12,11 @@ MAIL_PORT = int(os.getenv("MAIL_PORT"))
 
 def send_otp_email(to_email, otp, name="User"):
 
+    print("👉 send_otp_email() called")
+    print("👉 EMAIL:", EMAIL)
+    print("👉 MAIL_SERVER:", MAIL_SERVER)
+    print("👉 MAIL_PORT:", MAIL_PORT)
+
     subject = "🔐 Password Reset OTP | Plant Care"
 
     body = f"""
@@ -37,12 +42,22 @@ Stay secure,
     msg["To"] = to_email
 
     try:
-        server = smtplib.SMTP(MAIL_SERVER, MAIL_PORT)
+        print("👉 Connecting to SMTP...")
+        server = smtplib.SMTP(MAIL_SERVER, MAIL_PORT, timeout=10)
+
+        print("👉 Starting TLS...")
         server.starttls()
+
+        print("👉 Logging in...")
         server.login(EMAIL, PASSWORD)
+
+        print("👉 Sending email...")
         server.sendmail(EMAIL, to_email, msg.as_string())
+
+        print("👉 Quitting server...")
         server.quit()
+
         print("✅ OTP email sent successfully")
 
     except Exception as e:
-        print("❌ Email error:", e)
+        print("❌ Email error:", str(e))

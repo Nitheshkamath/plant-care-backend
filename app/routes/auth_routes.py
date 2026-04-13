@@ -9,6 +9,7 @@ from app.models.user import User
 from app.core.security import create_token, hash_password, generate_otp
 from datetime import datetime, timedelta
 from app.core.email_utils import send_otp_email
+import os
 
 router = APIRouter()
 
@@ -107,11 +108,18 @@ def google_login(data: dict, db: Session = Depends(get_db)):
         print("Unexpected Google login error:", str(e))
         raise HTTPException(status_code=500, detail="Google login failed")
 
-
 # 🔐 SEND OTP
 @router.post("/send-otp")
 def send_otp(data: dict, db: Session = Depends(get_db)):
-    email = data.get("email")
+    print("👉 API HIT: /send-otp")
+
+    email = data.get("email")  
+
+    print("👉 Email:", email)
+
+    print("👉 MAIL_USERNAME:", os.getenv("MAIL_USERNAME"))
+    print("👉 MAIL_SERVER:", os.getenv("MAIL_SERVER"))
+    print("👉 MAIL_PORT:", os.getenv("MAIL_PORT"))
 
     if not email:
         raise HTTPException(status_code=400, detail="Email required")
@@ -129,7 +137,10 @@ def send_otp(data: dict, db: Session = Depends(get_db)):
     db.commit()
 
     # 📧 Send OTP Email
+    print("👉 Calling send_otp_email()")
     send_otp_email(email, otp, user.name)
+
+    print("✅ OTP process completed")
 
     return {"message": "OTP sent to email"}
 
