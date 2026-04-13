@@ -1,21 +1,17 @@
 import os
-import smtplib
+import requests
 from dotenv import load_dotenv
-from email.mime.text import MIMEText
 
 load_dotenv()
 
-EMAIL = os.getenv("MAIL_USERNAME")
-PASSWORD = os.getenv("MAIL_PASSWORD")
-MAIL_SERVER = os.getenv("MAIL_SERVER")
-MAIL_PORT = int(os.getenv("MAIL_PORT"))
+SENDGRID_API_KEY = os.getenv("MAIL_PASSWORD")  # your SendGrid API key
+FROM_EMAIL = os.getenv("MAIL_FROM")  # verified sender email
+
 
 def send_otp_email(to_email, otp, name="User"):
 
     print("👉 send_otp_email() called")
-    print("👉 EMAIL:", EMAIL)
-    print("👉 MAIL_SERVER:", MAIL_SERVER)
-    print("👉 MAIL_PORT:", MAIL_PORT)
+    print("👉 FROM_EMAIL:", FROM_EMAIL)
 
     subject = "🔐 Password Reset OTP | Plant Care"
 
@@ -36,28 +32,41 @@ Stay secure,
 🌱 Plant Care Team
 """
 
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = EMAIL
-    msg["To"] = to_email
+    url = "https://api.sendgrid.com/v3/mail/send"
+
+    headers = {
+        "Authorization": f"Bearer {SENDGRID_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "personalizations": [
+            {
+                "to": [{"email": to_email}],
+                "subject": subject
+            }
+        ],
+        "from": {"email": FROM_EMAIL},
+        "content": [
+            {
+                "type": "text/plain",
+                "value": body
+            }
+        ]
+    }
 
     try:
-        print("👉 Connecting to SMTP...")
-        server = smtplib.SMTP(MAIL_SERVER, MAIL_PORT, timeout=10)
+        print("👉 Sending email via SendGrid API...")
 
-        print("👉 Starting TLS...")
-        server.starttls()
+        response = requests.post(url, headers=headers, json=data)
 
-        print("👉 Logging in...")
-        server.login(EMAIL, PASSWORD)
+        print("👉 Status Code:", response.status_code)
+        print("👉 Response:", response.text)
 
-        print("👉 Sending email...")
-        server.sendmail(EMAIL, to_email, msg.as_string())
-
-        print("👉 Quitting server...")
-        server.quit()
-
-        print("✅ OTP email sent successfully")
+        if response.status_code == 202:
+            print("✅ OTP email sent successfully")
+        else:
+            print("❌ Failed to send email")
 
     except Exception as e:
         print("❌ Email error:", str(e))
