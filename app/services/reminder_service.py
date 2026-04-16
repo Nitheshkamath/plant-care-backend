@@ -321,7 +321,6 @@ def complete_all_reminders(db: Session, user_id: int):
     return {"completed": len(reminders)}
 
 
-# GET PENDING (FOR UI)
 def get_pending_reminders(db: Session, user_id: int):
 
     now = datetime.now(timezone.utc)
@@ -331,25 +330,5 @@ def get_pending_reminders(db: Session, user_id: int):
         Reminder.status == "pending",
         Reminder.next_trigger_time <= now
     ).all()
-
-    for reminder in reminders:
-
-        # ✅ mark as triggered
-        reminder.last_triggered_at = now
-
-        # 🔁 calculate next trigger
-        next_time = calculate_next_trigger(
-            reminder.next_trigger_time,
-            reminder.type,
-            reminder.day_of_week
-        )
-
-        if next_time:
-            reminder.next_trigger_time = next_time
-            reminder.is_active = True
-        else:
-            reminder.is_active = False
-
-    db.commit()
 
     return reminders
