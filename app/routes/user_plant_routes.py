@@ -156,11 +156,17 @@ async def update_my_plant(
     if not plant:
         raise HTTPException(status_code=404, detail="Plant not found")
 
-    # ⭐ DUPLICATE CHECK
+    # 🔹 CLEAN INPUT (avoid "" issues)
+    plant_type = plant_type.strip() if plant_type else None
+    pot_size = pot_size.strip() if pot_size else None
+    location = location.strip() if location else None
+    watering_schedule = watering_schedule.strip() if watering_schedule else None
+
+    # ⭐ DUPLICATE CHECK (use final values)
     duplicate = db.query(UserPlant).filter(
         UserPlant.user_id == current_user.id,
         UserPlant.plant_name == plant_name,
-        UserPlant.location == location,
+        UserPlant.location == (location if location is not None else plant.location),
         UserPlant.id != plant_id
     ).first()
 
@@ -170,31 +176,39 @@ async def update_my_plant(
             detail="Another plant with same name and location already exists"
         )
 
-    # ⭐ CHECK IF ANY CHANGE
-    if (
+    # ⭐ CHECK IF ANY CHANGE (compare with existing safely)
+    no_change = (
         plant.plant_name == plant_name and
-        plant.plant_type == plant_type and
-        plant.pot_size == pot_size and
-        plant.location == location and
-        plant.watering_schedule == watering_schedule and
+        (plant_type is None or plant.plant_type == plant_type) and
+        (pot_size is None or plant.pot_size == pot_size) and
+        (location is None or plant.location == location) and
+        (watering_schedule is None or plant.watering_schedule == watering_schedule) and
         plant_image is None
-    ):
+    )
+
+    if no_change:
         raise HTTPException(
             status_code=400,
             detail="No record updated"
         )
 
+    # 🔥 SAFE UPDATE (ONLY UPDATE IF VALUE EXISTS)
     plant.plant_name = plant_name
-    plant.plant_type = plant_type
-    plant.pot_size = pot_size
-    plant.location = location
-    plant.watering_schedule = watering_schedule
+
+    if plant_type is not None:
+        plant.plant_type = plant_type
+
+    if pot_size is not None:
+        plant.pot_size = pot_size   # ✅ FIXED
+
+    if location is not None:
+        plant.location = location
+
+    if watering_schedule is not None:
+        plant.watering_schedule = watering_schedule
 
     # ✅ CLOUDINARY UPDATE
     if plant_image:
-
-        print("NEW CODE RUNNING")
-        print("CONTENT TYPE:", plant_image.content_type)
 
         filename = plant_image.filename or ""
 
@@ -212,7 +226,6 @@ async def update_my_plant(
     db.refresh(plant)
 
     return plant
-
 
 # 🗑️ DELETE PLANT
 @router.delete("/{plant_id}")
