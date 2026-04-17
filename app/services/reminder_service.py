@@ -300,33 +300,48 @@ def get_pending_alert_count(db: Session, user_id: int):
 # COMPLETE ALL
 def complete_all_reminders(db: Session, user_id: int):
 
-    now = datetime.now(timezone.utc)
-
     reminders = db.query(Reminder).filter(
         Reminder.user_id == user_id,
         Reminder.status == "pending",
         Reminder.is_alert_active == True
     ).all()
 
+    success_count = 0
+
     for reminder in reminders:
 
-        reminder.status = "completed"
-        reminder.is_active = False
-        reminder.is_alert_active = False
+        try:
+            # ✅ Check plant exists
+            plant = db.query(UserPlant).filter(
+                UserPlant.id == reminder.plant_id
+            ).first()
 
-        history = CareHistory(
-            user_id=user_id,
-            plant_id=reminder.plant_id,
-            action_type=reminder.type,
-            note=reminder.title,
-            created_at=datetime.now(timezone.utc)
-        )
+            if not plant:
+                print("⚠️ Skipping invalid plant:", reminder.plant_id)
+                continue
 
-        db.add(history)
+            reminder.status = "completed"
+            reminder.is_active = False
+            reminder.is_alert_active = False
+
+            history = CareHistory(
+                user_id=user_id,
+                plant_id=reminder.plant_id,
+                action_type=reminder.type,
+                note=reminder.title,
+                created_at=datetime.now(timezone.utc)
+            )
+
+            db.add(history)
+            success_count += 1
+
+        except Exception as e:
+            print("❌ Error:", reminder.id, e)
+            continue
 
     db.commit()
 
-    return {"completed": len(reminders)}
+    return {"completed": success_count}
 
 
 # GET PENDING (FOR UI) 
