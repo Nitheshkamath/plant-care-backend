@@ -1,7 +1,8 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime,timezone
 from app.database.db import Base
+
 
 
 class CareHistory(Base):
@@ -19,7 +20,7 @@ class CareHistory(Base):
 
     note = Column(String(500), nullable=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     # relationships
     user = relationship("User")
