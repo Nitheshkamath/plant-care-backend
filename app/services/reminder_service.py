@@ -4,6 +4,10 @@ from app.models.reminder import Reminder
 from app.models.care_histroy import CareHistory
 from app.schemas.reminder_schema import ReminderCreate
 from app.models.user_plant import UserPlant
+from datetime import timezone
+import pytz
+
+IST = pytz.timezone("Asia/Kolkata")
 
 
 # 🔥 HELPER: calculate next trigger
@@ -28,15 +32,13 @@ def calculate_next_trigger(reminder_time, reminder_type, day_of_week=None):
 
     return None
 
-
-# CREATE REMINDER
 def create_reminder(db: Session, user, data: ReminderCreate):
 
     reminder_time = data.reminder_time
 
-    # ✅ Ensure UTC
+    # ✅ FIX: Convert IST → UTC properly
     if reminder_time.tzinfo is None:
-        reminder_time = reminder_time.replace(tzinfo=timezone.utc)
+        reminder_time = IST.localize(reminder_time).astimezone(timezone.utc)
     else:
         reminder_time = reminder_time.astimezone(timezone.utc)
 
@@ -62,7 +64,7 @@ def create_reminder(db: Session, user, data: ReminderCreate):
         day_of_week=data.day_of_week,
         status="pending",
         is_active=True,
-        next_trigger_time=reminder_time,  # 🔥 IMPORTANT
+        next_trigger_time=reminder_time,  # ✅ correct
         created_by=user.email
     )
 
@@ -243,12 +245,12 @@ def update_reminder(db: Session, reminder_id: int, user_id: int, data):
     if not reminder:
         return None
 
-    # ✅ UTC FIX
+    # ✅ FIX: Proper IST → UTC conversion
     if data.reminder_time is not None:
         reminder_time = data.reminder_time
 
         if reminder_time.tzinfo is None:
-            reminder_time = reminder_time.replace(tzinfo=timezone.utc)
+            reminder_time = IST.localize(reminder_time).astimezone(timezone.utc)
         else:
             reminder_time = reminder_time.astimezone(timezone.utc)
     else:
@@ -266,8 +268,9 @@ def update_reminder(db: Session, reminder_id: int, user_id: int, data):
     if duplicate:
         return {"error": "Duplicate reminder exists"}
 
+    # ✅ UPDATE VALUES
     reminder.reminder_time = reminder_time
-    reminder.next_trigger_time = reminder_time  # 🔥 RESET
+    reminder.next_trigger_time = reminder_time  # 🔥 reset trigger correctly
 
     if data.title is not None:
         reminder.title = data.title
@@ -345,9 +348,38 @@ def complete_all_reminders(db: Session, user_id: int):
 
 
 # GET PENDING (FOR UI) 
-def get_pending_reminders(db: Session, user_id: int): 
-    return db.query(Reminder).filter(
-         Reminder.user_id == user_id, 
-         Reminder.status == "pending", 
-         Reminder.is_alert_active == True 
-    ).order_by(Reminder.last_triggered_at.desc()).all()
+def get_pending_reminders(db: Session, user_id: int):
+
+    reminders = (
+        db.query(Reminder, UserPlant)
+        .join(UserPlant, Reminder.plant_id == UserPlant.id)
+        .filter(
+            Reminder.user_id == user_id,
+            Reminder.status == "pending",
+            Reminder.is_alert_active == True
+        )
+        .order_by(Reminder.last_triggered_at.desc())
+        .all()
+    )
+
+    result = []
+
+    for reminder, plant in reminders:
+
+        image = plant.plant_image
+
+        if not image and plant.plant:
+            image = plant.plant.image_url
+
+        result.append({
+            "id": reminder.id,
+            "plant_id": reminder.plant_id,
+            "plant_name": plant.plant_name,     # ✅ IMPORTANT
+            "plant_image": image,
+            "title": reminder.title,
+            "description": reminder.description,
+            "type": reminder.type,              # ✅ action type
+            "created_at": reminder.last_triggered_at,  # ✅ for UI date
+        })
+
+    return result

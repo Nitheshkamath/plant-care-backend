@@ -30,7 +30,7 @@ def get_user_care_history(db: Session, user_id: int):
             "plant_image": image,
             "action_type": history.action_type,
             "note": history.note,
-            "created_at": history.created_at
+            "created_at": history.created_at.isoformat()
         })
 
     return result
