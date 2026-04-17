@@ -112,11 +112,12 @@ def pending_reminders(
 ):
     return get_pending_reminders(db, current_user.id)
 
-@router.put("/reminders/complete-all")
+@router.put("/complete-all")
 def complete_all(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+
 
     return complete_all_reminders(db, current_user.id)
 
