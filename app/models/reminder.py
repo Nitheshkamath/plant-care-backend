@@ -49,6 +49,7 @@ class Reminder(Base):
     )
 
     created_by = Column(String(100))
+    is_alert_active = Column(Boolean, default=False, index=True)
 
     # relationships
     user = relationship("User")
