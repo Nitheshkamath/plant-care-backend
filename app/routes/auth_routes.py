@@ -142,7 +142,9 @@ def send_otp(data: dict, db: Session = Depends(get_db)):
 
     print("✅ OTP process completed")
 
-    return {"message": "OTP sent to email"}
+    return {
+        "message": "OTP sent to your email. Please check your inbox (and Spam/Junk folder if you don't see it)."
+    }
 
 
 # 🔐 VERIFY OTP + RESET PASSWORD
