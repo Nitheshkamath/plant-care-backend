@@ -162,24 +162,42 @@ def complete_reminder(db: Session, reminder_id: int, user_id: int):
     if not reminder:
         return None
 
-    reminder.status = "completed"
-    reminder.is_active = False
-    reminder.is_alert_active = False
+    now = datetime.now(timezone.utc)
 
     history = CareHistory(
         user_id=user_id,
         plant_id=reminder.plant_id,
         action_type=reminder.type,
         note=reminder.title,
-        created_at=datetime.now(timezone.utc)
+        created_at=now
     )
-
     db.add(history)
+
+    # 🔥 FIX LOGIC BASED ON TYPE
+    if reminder.type in ["daily", "weekly"]:
+
+        # 🔁 move to next cycle
+        next_time = calculate_next_trigger(
+            reminder.next_trigger_time or now,
+            reminder.type,
+            reminder.day_of_week
+        )
+
+        reminder.next_trigger_time = next_time
+        reminder.status = "pending"           # 🔥 keep alive
+        reminder.is_active = True             # 🔥 keep recurring
+        reminder.is_alert_active = False      # reset alert
+
+    else:
+        # ✅ only for one-time reminders
+        reminder.status = "completed"
+        reminder.is_active = False
+        reminder.is_alert_active = False
+
     db.commit()
     db.refresh(reminder)
 
     return reminder
-
 
 # SKIP REMINDER
 def skip_reminder(db: Session, reminder_id: int, user_id: int):
