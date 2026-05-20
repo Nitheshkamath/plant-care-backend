@@ -36,8 +36,8 @@ app.add_middleware(
 # ---------- Startup ----------
 @app.on_event("startup")
 def startup_event():
-    create_tables()       # ✅ ensure tables created
-    run_scheduler()       # 🔥 start background job
+    create_tables()       #  ensure tables created
+    run_scheduler()       #  start background job
 
 
 # ---------- Routers ----------
@@ -47,5 +47,5 @@ app.include_router(plant_routes.router)
 app.include_router(reminder_routes.router)
 app.include_router(care_histroy_routes.router)
 app.include_router(user_plant_routes.router, tags=["User plants"])
-app.include_router(device_router)  # 🔥 NEW (FCM)
+app.include_router(device_router) #
 

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text
+from sqlalchemy import Column, Integer, String, Text,JSON
 from app.database.db import Base
 
 class Plant(Base):
@@ -21,3 +21,4 @@ class Plant(Base):
     recommended_pot_size = Column(String(100))
 
     image_url = Column(Text)
+    external_links = Column(JSON)

@@ -13,7 +13,7 @@ class Device(Base):
 
     fcm_token = Column(String(500), nullable=False, unique=True)
 
-    device_type = Column(String(50))  # android / ios
+    device_type = Column(String(50))  # android ios
 
     is_active = Column(Integer, default=1)
 
