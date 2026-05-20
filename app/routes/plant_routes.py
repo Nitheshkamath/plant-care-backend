@@ -144,4 +144,3 @@ def search_plants(
 
         for p in plants
     ]
-}
