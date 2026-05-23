@@ -20,7 +20,8 @@ from app.core.security import (
     create_refresh_token,
     decode_token,
     hash_password,
-    generate_otp
+    generate_otp,
+    get_current_user
 )
 
 from datetime import datetime, timedelta
@@ -308,6 +309,22 @@ def refresh_token(
         new_access_token
     }
 
+# ---------------------------------------------------
+# LOGOUT
+# ---------------------------------------------------
+@router.post("/logout")
+def logout(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    current_user.refresh_token = None
+
+    db.commit()
+
+    return {
+        "message": "Logged out successfully"
+    }
 
 # ---------------------------------------------------
 # SEND OTP

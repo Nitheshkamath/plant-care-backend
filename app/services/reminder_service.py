@@ -141,7 +141,7 @@ def mark_reminder_triggered(db: Session, reminder: Reminder):
     reminder.is_alert_active = True
 
     # 🔁 Calculate next trigger
-    next_time = calculate_next_trigger(now,reminder.type,reminder.day_of_week)
+    next_time = calculate_next_trigger(reminder.next_trigger_time,reminder.type,reminder.day_of_week)
 
     if next_time:
         reminder.next_trigger_time = next_time
@@ -220,7 +220,7 @@ def skip_reminder(db: Session, reminder_id: int, user_id: int):
 
     # 🔁 Move to next cycle (IMPORTANT: use now)
     next_time = calculate_next_trigger(
-        now,
+        reminder.next_trigger_time or now,
         reminder.type,
         reminder.day_of_week
     )
@@ -332,19 +332,19 @@ def complete_all_reminders(db: Session, user_id: int):
     for reminder in reminders:
 
         try:
-            # ✅ Check plant exists
+
             plant = db.query(UserPlant).filter(
                 UserPlant.id == reminder.plant_id
             ).first()
 
             if not plant:
-                print("⚠️ Skipping invalid plant:", reminder.plant_id)
+                print(
+                    "⚠️ Skipping invalid plant:",
+                    reminder.plant_id
+                )
                 continue
 
-            reminder.status = "completed"
-            reminder.is_active = False
-            reminder.is_alert_active = False
-
+            # 🌱 Save history
             history = CareHistory(
                 user_id=user_id,
                 plant_id=reminder.plant_id,
@@ -354,16 +354,45 @@ def complete_all_reminders(db: Session, user_id: int):
             )
 
             db.add(history)
+
+            # 🔁 Recurring reminders
+            if reminder.type in ["daily", "weekly"]:
+
+                next_time = calculate_next_trigger(
+                    reminder.next_trigger_time or datetime.now(timezone.utc),
+                    reminder.type,
+                    reminder.day_of_week
+                )
+
+                reminder.next_trigger_time = next_time
+                reminder.status = "pending"
+                reminder.is_active = True
+                reminder.is_alert_active = False
+
+            # ✅ One-time reminder
+            else:
+
+                reminder.status = "completed"
+                reminder.is_active = False
+                reminder.is_alert_active = False
+
             success_count += 1
 
         except Exception as e:
-            print("❌ Error:", reminder.id, e)
+
+            print(
+                "❌ Error:",
+                reminder.id,
+                e
+            )
+
             continue
 
     db.commit()
 
-    return {"completed": success_count}
-
+    return {
+        "completed": success_count
+    }
 
 # GET PENDING (FOR UI) 
 def get_pending_reminders(db: Session, user_id: int):
